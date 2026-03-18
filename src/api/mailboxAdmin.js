@@ -27,6 +27,50 @@ import {
 export async function handleMailboxAdminApi(request, db, url, path, options) {
   const isMock = !!options.mockOnly;
 
+  // 删除当前用户的所有邮箱
+  if (path === '/api/mailboxes/all' && request.method === 'DELETE') {
+    if (isMock) return errorResponse('演示模式不可删除', 403);
+
+    const payload = getJwtPayload(request, options);
+    let uid = Number(payload?.userId || 0);
+
+    if (!uid && isStrictAdmin(request, options)) {
+      try {
+        const { results } = await db.prepare('SELECT id FROM users WHERE username = ?')
+          .bind(String(options?.adminName || 'admin').toLowerCase()).all();
+        if (results && results.length) {
+          uid = Number(results[0].id);
+        }
+      } catch (_) {}
+    }
+
+    if (!uid) return errorResponse('未登录或无权限', 401);
+
+    try {
+      try { await db.exec('BEGIN'); } catch (_) {}
+
+      await db.prepare(
+        'DELETE FROM messages WHERE mailbox_id IN (SELECT mailbox_id FROM user_mailboxes WHERE user_id = ?)'
+      ).bind(uid).run();
+
+      const deleteResult = await db.prepare(
+        'DELETE FROM mailboxes WHERE id IN (SELECT mailbox_id FROM user_mailboxes WHERE user_id = ?)'
+      ).bind(uid).run();
+
+      await db.prepare('DELETE FROM user_mailboxes WHERE user_id = ?').bind(uid).run();
+
+      try { await db.exec('COMMIT'); } catch (_) {}
+
+      const deleted = deleteResult?.meta?.changes || 0;
+      invalidateSystemStatCache('total_mailboxes');
+
+      return Response.json({ success: true, deleted });
+    } catch (e) {
+      try { await db.exec('ROLLBACK'); } catch (_) {}
+      return errorResponse('删除失败: ' + e.message, 500);
+    }
+  }
+
   // 删除邮箱
   if (path === '/api/mailboxes' && request.method === 'DELETE') {
     if (isMock) return errorResponse('演示模式不可删除', 403);
