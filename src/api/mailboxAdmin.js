@@ -370,6 +370,8 @@ export async function handleMailboxAdminApi(request, db, url, path, options) {
       let failCount = 0;
       const results = [];
 
+      try { await db.exec('BEGIN'); } catch (_) {}
+
       for (const address of normalizedAddresses) {
         try {
           const mailboxId = await getMailboxIdByAddress(db, address);
@@ -390,6 +392,8 @@ export async function handleMailboxAdminApi(request, db, url, path, options) {
           results.push({ address, success: false, error: e.message || '删除失败' });
         }
       }
+
+      try { await db.exec('COMMIT'); } catch (_) {}
 
       invalidateSystemStatCache('total_mailboxes');
 
