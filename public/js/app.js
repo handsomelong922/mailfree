@@ -18,7 +18,7 @@ import { initSessionFromCache, validateSession, isGuest, isAdmin, applySessionUI
 import { loadDomains, getStoredLength, saveLength, updateRangeProgress, getSelectedDomainIndex, populateDomains, STORAGE_KEYS } from './modules/app/domains.js';
 import { initCompose, showSentEmailDetail } from './modules/app/compose.js';
 import { showEmailDetail, deleteEmailById, deleteSentById, copyFromEmailList, prefetchEmails } from './modules/app/email-viewer.js';
-import { generateMailbox, generateNameMailbox, createCustomMailbox, updateEmailDisplay, selectMailboxAddress, toggleMailboxPin, deleteMailboxAddress, copyMailboxAddress, clearAllEmails, logout } from './modules/app/mailbox-actions.js';
+import { generateMailbox, generateNameMailbox, createCustomMailbox, updateEmailDisplay, selectMailboxAddress, toggleMailboxPin, deleteMailboxAddress, deleteAllMailboxes, copyMailboxAddress, clearAllEmails, logout } from './modules/app/mailbox-actions.js';
 
 // 全局状态
 window.__GUEST_MODE__ = false;
@@ -67,6 +67,7 @@ const els = {
   pager: document.getElementById('list-pager'), prevPage: document.getElementById('prev-page'), nextPage: document.getElementById('next-page'), pageInfo: document.getElementById('page-info'),
   sidebarToggle: document.getElementById('sidebar-toggle'), sidebarToggleIcon: document.getElementById('sidebar-toggle-icon'),
   sidebar: document.querySelector('.sidebar'), container: document.querySelector('.container'),
+  mbDeleteAll: document.getElementById('mb-delete-all'),
   forwardSetting: document.getElementById('forward-setting'), toggleFavorite: document.getElementById('toggle-favorite'),
   favoriteIcon: document.getElementById('favorite-icon'), favoriteText: document.getElementById('favorite-text')
 };
@@ -170,6 +171,7 @@ if (els.createCustomOverlay) els.createCustomOverlay.onclick = () => createCusto
 
 // 侧边栏
 if (els.sidebarToggle) { els.sidebarToggle.onclick = () => { els.sidebar?.classList.toggle('collapsed'); els.container?.classList.toggle('sidebar-collapsed'); const c = els.sidebar?.classList.contains('collapsed'); if (els.sidebarToggleIcon) els.sidebarToggleIcon.textContent = c ? '▶' : '◀'; localStorage.setItem('sidebar-collapsed', c ? '1' : '0'); }; if (localStorage.getItem('sidebar-collapsed') === '1') { els.sidebar?.classList.add('collapsed'); els.container?.classList.add('sidebar-collapsed'); if (els.sidebarToggleIcon) els.sidebarToggleIcon.textContent = '▶'; }}
+if (els.mbDeleteAll) els.mbDeleteAll.onclick = () => deleteAllMailboxes(els, api, showToast, showConfirm, loadMailboxes);
 
 // 转发和收藏
 if (els.forwardSetting) els.forwardSetting.onclick = () => { 

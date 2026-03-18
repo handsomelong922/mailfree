@@ -263,6 +263,40 @@ export async function deleteMailboxAddress(event, address, elements, api, showTo
 }
 
 /**
+ * 删除所有邮箱
+ * @param {object} elements - DOM 元素
+ * @param {Function} api - API 函数
+ * @param {Function} showToast - 提示函数
+ * @param {Function} showConfirm - 确认函数
+ * @param {Function} loadMailboxes - 加载邮箱函数
+ */
+export async function deleteAllMailboxes(elements, api, showToast, showConfirm, loadMailboxes) {
+  const confirmed = await showConfirm('确定删除所有邮箱？所有邮件也将被清空，且无法恢复！');
+  if (!confirmed) return;
+
+  try {
+    const r = await api('/api/mailboxes/all', { method: 'DELETE' });
+    if (r.ok) {
+      const data = await r.json();
+      showToast(`已删除 ${data.deleted || 0} 个邮箱`, 'success');
+      clearCurrentMailbox();
+      const emailText = document.getElementById('email-text');
+      if (emailText) emailText.innerHTML = '<span class="placeholder-text">点击右侧生成按钮创建邮箱地址</span>';
+      else if (elements.email) elements.email.textContent = '点击生成邮箱';
+      elements.email?.classList.remove('has-email');
+      if (elements.emailActions) elements.emailActions.style.display = 'none';
+      if (elements.listCard) elements.listCard.style.display = 'none';
+      if (elements.list) elements.list.innerHTML = '';
+      stopAutoRefresh();
+      resetMbPage();
+      await loadMailboxes({ forceFresh: true });
+    }
+  } catch (e) {
+    showToast(e.message || '删除失败', 'error');
+  }
+}
+
+/**
  * 复制邮箱地址
  * @param {Function} showToast - 提示函数
  */
@@ -336,6 +370,7 @@ export default {
   selectMailboxAddress,
   toggleMailboxPin,
   deleteMailboxAddress,
+  deleteAllMailboxes,
   copyMailboxAddress,
   clearAllEmails,
   logout
