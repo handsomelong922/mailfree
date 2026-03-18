@@ -146,6 +146,19 @@ export async function setFavorite(mailboxId, isFavorite) {
   });
 }
 
+/**
+ * 批量删除邮箱（按邮箱地址）
+ * @param {Array<string>} addresses - 邮箱地址列表
+ * @returns {Promise<Response>}
+ */
+export async function batchDeleteByAddress(addresses) {
+  return api('/api/mailboxes/batch-delete-by-address', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ addresses })
+  });
+}
+
 export default {
   api,
   loadMailboxes,
@@ -156,5 +169,6 @@ export default {
   toggleLogin,
   batchToggleLogin,
   setForward,
-  setFavorite
+  setFavorite,
+  batchDeleteByAddress
 };
