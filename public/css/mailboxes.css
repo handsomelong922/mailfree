@@ -227,6 +227,69 @@
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
 }
 
+/* =========================================
+   勾选框样式（卡片视图和列表视图通用）
+   ========================================= */
+
+/* 卡片视图：勾选框悬停时才显示，选中时常驻显示 */
+.mailbox-card .mailbox-check-wrap {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.mailbox-card:hover .mailbox-check-wrap,
+.mailbox-card.selected .mailbox-check-wrap {
+  opacity: 1;
+}
+
+.mailbox-card .mailbox-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+/* 列表视图：勾选框始终可见，紧贴左侧 */
+.mailbox-list-item .mailbox-check-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.mailbox-list-item .mailbox-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+/* 选中状态高亮 */
+.mailbox-card.selected {
+  border-color: rgba(99, 102, 241, 0.55) !important;
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.95) 0%, rgba(224, 231, 255, 0.95) 100%) !important;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.18), 0 0 0 2px rgba(99, 102, 241, 0.3) !important;
+}
+
+.mailbox-list-item.selected {
+  border-color: rgba(99, 102, 241, 0.45) !important;
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.9) 0%, rgba(224, 231, 255, 0.9) 100%) !important;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12), 0 0 0 1px rgba(99, 102, 241, 0.25) !important;
+}
+
 /* 悬停操作区 - 2x2 网格布局 */
 .mailbox-card .actions{
   position: absolute;

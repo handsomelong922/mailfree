@@ -5,7 +5,7 @@
 
 import { getCurrentUserKey } from './storage.js';
 import { openForwardDialog, toggleFavorite, batchSetFavorite, injectDialogStyles } from './mailbox-settings.js';
-import { api, loadMailboxes as fetchMailboxes, loadDomains as fetchDomains, deleteMailbox as apiDeleteMailbox, toggleLogin as apiToggleLogin, batchToggleLogin, resetPassword as apiResetPassword, changePassword as apiChangePassword } from './modules/mailboxes/api.js';
+import { api, loadMailboxes as fetchMailboxes, loadDomains as fetchDomains, deleteMailbox as apiDeleteMailbox, toggleLogin as apiToggleLogin, batchToggleLogin, resetPassword as apiResetPassword, changePassword as apiChangePassword, batchDeleteByAddress as apiBatchDeleteByAddress } from './modules/mailboxes/api.js';
 import { formatTime, escapeHtml, generateSkeleton, renderGrid, renderList } from './modules/mailboxes/render.js';
 
 injectDialogStyles();
@@ -37,6 +37,8 @@ const els = {
   batchUnfavorite: document.getElementById('batch-unfavorite'),
   batchForward: document.getElementById('batch-forward'),
   batchClearForward: document.getElementById('batch-clear-forward'),
+  batchDelete: document.getElementById('batch-delete'),
+  selectAll: document.getElementById('select-all'),
   // 批量操作模态框
   batchModal: document.getElementById('batch-login-modal'),
   batchModalClose: document.getElementById('batch-modal-close'),
@@ -67,6 +69,9 @@ let page = 1, PAGE_SIZE = 20, lastCount = 0, currentData = [];
 let currentView = localStorage.getItem('mf:mailboxes:view') || 'grid';
 let searchTimeout = null, isLoading = false;
 let availableDomains = [];
+
+// 选中邮箱集合
+const selectedAddresses = new Set();
 
 // 加载邮箱列表
 async function load() {
@@ -100,6 +105,7 @@ async function load() {
     }
     
     updatePager();
+    syncCheckboxes();
     bindCardEvents();
   } catch (e) {
     console.error('加载失败:', e);
@@ -107,6 +113,27 @@ async function load() {
   } finally {
     isLoading = false;
   }
+}
+
+// 同步勾选框状态（在渲染后恢复选中状态）
+function syncCheckboxes() {
+  els.grid?.querySelectorAll('.mailbox-checkbox').forEach(cb => {
+    cb.checked = selectedAddresses.has(cb.dataset.address);
+    cb.closest('.mailbox-card, .mailbox-list-item')?.classList.toggle('selected', cb.checked);
+  });
+  updateSelectAllButton();
+}
+
+// 更新全选按钮状态
+function updateSelectAllButton() {
+  if (!els.selectAll) return;
+  const allBoxes = els.grid?.querySelectorAll('.mailbox-checkbox') || [];
+  const total = allBoxes.length;
+  const checked = Array.from(allBoxes).filter(cb => cb.checked).length;
+  const isAllSelected = total > 0 && checked === total;
+  const span = els.selectAll.querySelector('span:last-child');
+  if (span) span.textContent = isAllSelected ? '取消全选' : '全选';
+  els.selectAll.querySelector('.btn-icon').textContent = isAllSelected ? '☑' : '☐';
 }
 
 // 更新分页器
@@ -119,11 +146,25 @@ function updatePager() {
 
 // 绑定卡片事件
 function bindCardEvents() {
+  // 绑定勾选框事件
+  els.grid?.querySelectorAll('.mailbox-checkbox').forEach(cb => {
+    cb.onchange = () => {
+      const addr = cb.dataset.address;
+      if (cb.checked) {
+        selectedAddresses.add(addr);
+      } else {
+        selectedAddresses.delete(addr);
+      }
+      cb.closest('.mailbox-card, .mailbox-list-item')?.classList.toggle('selected', cb.checked);
+      updateSelectAllButton();
+    };
+  });
+
   // 绑定卡片点击跳转（网格视图）
   els.grid?.querySelectorAll('.mailbox-card[data-action="jump"]').forEach(card => {
     card.onclick = (e) => {
-      // 如果点击的是按钮区域，不跳转
-      if (e.target.closest('.actions')) return;
+      // 如果点击的是按钮区域或勾选框区域，不跳转
+      if (e.target.closest('.actions') || e.target.closest('.mailbox-check-wrap')) return;
       const address = card.dataset.address;
       if (address) {
         showToast('跳转中...', 'info', 500);
@@ -218,6 +259,7 @@ function switchView(view) {
   els.grid.className = view;
   if (currentData.length) {
     els.grid.innerHTML = view === 'grid' ? renderGrid(currentData) : renderList(currentData);
+    syncCheckboxes();
     bindCardEvents();
   }
 }
@@ -412,6 +454,16 @@ async function executeBatchAction() {
           body: JSON.stringify({ addresses: emails, forward_to: null })
         });
         break;
+      case 'delete': {
+        const res = await apiBatchDeleteByAddress(emails);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        showToast(`已删除 ${data.success_count} 个邮箱`, 'success');
+        emails.forEach(addr => selectedAddresses.delete(addr));
+        closeBatchModal();
+        load();
+        return;
+      }
     }
     showToast('批量操作完成', 'success');
     closeBatchModal();
@@ -449,6 +501,34 @@ els.batchFavorite?.addEventListener('click', () => openBatchModal('favorite', '�
 els.batchUnfavorite?.addEventListener('click', () => openBatchModal('unfavorite', '批量取消收藏', '☆', '输入要取消收藏的邮箱地址（每行一个或用逗号分隔）：'));
 els.batchForward?.addEventListener('click', () => openBatchModal('forward', '批量设置转发', '↪️', '输入要设置转发的邮箱地址（每行一个或用逗号分隔）：'));
 els.batchClearForward?.addEventListener('click', () => openBatchModal('clear-forward', '批量清除转发', '🚫', '输入要清除转发的邮箱地址（每行一个或用逗号分隔）：'));
+
+// 批量删除按钮：若有选中邮箱则预填充并打开模态框，否则直接打开空模态框
+els.batchDelete?.addEventListener('click', () => {
+  const selected = Array.from(selectedAddresses);
+  openBatchModal('delete', '批量删除邮箱', '🗑️', '输入要删除的邮箱地址（每行一个或用逗号分隔）：');
+  if (selected.length && els.batchEmailsInput) {
+    els.batchEmailsInput.value = selected.join('\n');
+    updateBatchCount();
+  }
+});
+
+// 全选/取消全选
+els.selectAll?.addEventListener('click', () => {
+  const allBoxes = Array.from(els.grid?.querySelectorAll('.mailbox-checkbox') || []);
+  if (!allBoxes.length) return;
+  const allChecked = allBoxes.every(cb => cb.checked);
+  allBoxes.forEach(cb => {
+    cb.checked = !allChecked;
+    const addr = cb.dataset.address;
+    if (!allChecked) {
+      selectedAddresses.add(addr);
+    } else {
+      selectedAddresses.delete(addr);
+    }
+    cb.closest('.mailbox-card, .mailbox-list-item')?.classList.toggle('selected', !allChecked);
+  });
+  updateSelectAllButton();
+});
 
 // 批量操作模态框事件
 els.batchModalClose?.addEventListener('click', closeBatchModal);
